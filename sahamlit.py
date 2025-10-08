@@ -970,6 +970,7 @@ if analyze_button:
         except Exception as e:
             st.error(f"Error in model training: {str(e)}")
     
+# TAB 4 - PREDIKSI (LENGKAP - SUDAH DIPERBAIKI)
     with tab4:
         st.subheader("🔮 Prediksi Harga Masa Depan")
         
@@ -999,29 +1000,13 @@ if analyze_button:
                         st.error("Failed to generate predictions")
                         st.stop()
                     
-                    # --- PERBAIKAN DIMULAI DI SINI ---
                     # Generate future dates (trading days only)
                     last_date = st.session_state.stock_data.index[-1]
-                    # Menggunakan pd.date_range dengan frekuensi 'B' (business day)
-                    future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=n_days_predict, freq='B')
-                    # --- PERBAIKAN SELESAI ---
-
-                    # Konversi ke Python datetime (bukan pandas Timestamp)
-                    if hasattr(last_date, 'to_pydatetime'):
-                        last_date = last_date.to_pydatetime()
-                    else:
-                        last_date = datetime.fromisoformat(str(last_date))
-
-                    future_dates = []
-                    current_date = last_date
-
-                    while len(future_dates) < n_days_predict:
-                        current_date = current_date + timedelta(days=1)
-                        # Skip weekend (Sabtu=5, Minggu=6)
-                        if current_date.weekday() < 5:  # Senin-Jumat (0-4)
-                            future_dates.append(current_date)
-
-                    future_dates = pd.DatetimeIndex(future_dates)
+                    
+                    # Menggunakan pd.bdate_range untuk business days (hari kerja)
+                    # Tambahkan 1 hari dari last_date menggunakan pd.Timedelta
+                    start_date = last_date + pd.Timedelta(days=1)
+                    future_dates = pd.bdate_range(start=start_date, periods=n_days_predict)
                     
                     # Create prediction dataframe
                     prediction_df = pd.DataFrame({
@@ -1140,12 +1125,12 @@ if analyze_button:
                     prediction_display = prediction_df.copy()
                     prediction_display['Daily_Change'] = prediction_display['Predicted_Price'].diff()
                     prediction_display['Daily_Change_%'] = prediction_display['Predicted_Price'].pct_change() * 100
-
-                    # ✅ PERBAIKAN: Gunakan nama kolom, bukan indeks
+                    
+                    # Set first row values using .iloc
                     first_predicted_price = prediction_display['Predicted_Price'].iloc[0]
-                    prediction_display.loc[prediction_display.index[0], 'Daily_Change'] = \
+                    prediction_display.iloc[0, prediction_display.columns.get_loc('Daily_Change')] = \
                         first_predicted_price - last_actual
-                    prediction_display.loc[prediction_display.index[0], 'Daily_Change_%'] = \
+                    prediction_display.iloc[0, prediction_display.columns.get_loc('Daily_Change_%')] = \
                         (first_predicted_price - last_actual) / last_actual * 100
                     
                     st.dataframe(
@@ -1203,7 +1188,10 @@ if analyze_button:
                     
             except Exception as e:
                 st.error(f"Error generating predictions: {str(e)}")
+                import traceback
+                st.code(traceback.format_exc())
     
+    # TAB 5 - EXPORT DATA (LENGKAP - SUDAH DIPERBAIKI)
     with tab5:
         st.subheader("💾 Export Data dan Model")
         
@@ -1225,7 +1213,11 @@ if analyze_button:
             if st.session_state.model_trained:
                 try:
                     # Generate predictions again for export
+                    close_prices = st.session_state.stock_data['Close'].values.reshape(-1, 1)
+                    scaler = st.session_state.scaler
+                    scaled_data = scaler.transform(close_prices)
                     last_sequence = scaled_data[-lookback:]
+                    
                     future_predictions = predict_future(
                         st.session_state.model,
                         last_sequence,
@@ -1235,27 +1227,12 @@ if analyze_button:
                     )
                     
                     if future_predictions is not None:
-                        # ✅ PERBAIKAN: Gunakan cara yang sama seperti Tab4
-                        last_date = st.session_state.stock_data.index[-1]
-                        future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=n_days_predict, freq='B')
-                        
-                        # Konversi ke Python datetime
-                        if hasattr(last_date, 'to_pydatetime'):
-                            last_date = last_date.to_pydatetime()
-                        else:
-                            last_date = datetime.fromisoformat(str(last_date))
-                        
                         # Generate future dates (trading days only)
-                        future_dates = []
-                        current_date = last_date
+                        last_date = st.session_state.stock_data.index[-1]
                         
-                        while len(future_dates) < n_days_predict:
-                            current_date = current_date + timedelta(days=1)
-                            # Skip weekend
-                            if current_date.weekday() < 5:  # Senin-Jumat (0-4)
-                                future_dates.append(current_date)
-                        
-                        future_dates = pd.DatetimeIndex(future_dates)
+                        # Menggunakan pd.bdate_range untuk business days
+                        start_date = last_date + pd.Timedelta(days=1)
+                        future_dates = pd.bdate_range(start=start_date, periods=n_days_predict)
                         
                         export_df = pd.DataFrame({
                             'Date': future_dates,
@@ -1271,13 +1248,36 @@ if analyze_button:
                         )
                 except Exception as e:
                     st.error(f"Error exporting predictions: {str(e)}")
+                    import traceback
+                    st.code(traceback.format_exc())
         
         with col3:
             st.subheader("📈 Export Report")
             if st.session_state.model_trained:
                 try:
-                    # Generate comprehensive report
-                    report = f"""
+                    # Re-generate predictions for report
+                    close_prices = st.session_state.stock_data['Close'].values.reshape(-1, 1)
+                    scaler = st.session_state.scaler
+                    scaled_data = scaler.transform(close_prices)
+                    last_sequence = scaled_data[-lookback:]
+                    
+                    future_predictions = predict_future(
+                        st.session_state.model,
+                        last_sequence,
+                        st.session_state.scaler,
+                        n_days_predict,
+                        lookback
+                    )
+                    
+                    if future_predictions is not None:
+                        pred_mean = future_predictions.mean()
+                        pred_min = future_predictions.min()
+                        pred_max = future_predictions.max()
+                        last_actual = stock_data['Close'].iloc[-1]
+                        expected_return = ((future_predictions[-1] - last_actual) / last_actual) * 100
+                        
+                        # Generate comprehensive report
+                        report = f"""
 LAPORAN ANALISIS PREDIKSI SAHAM
 ================================
 Tanggal: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
@@ -1323,14 +1323,16 @@ DISCLAIMER
 Prediksi ini hanya untuk tujuan edukasi dan penelitian.
 Tidak boleh digunakan sebagai saran investasi.
 """
-                    st.download_button(
-                        label="Download Full Report (TXT)",
-                        data=report,
-                        file_name=f"{ticker_input}_report_{datetime.now().strftime('%Y%m%d')}.txt",
-                        mime="text/plain"
-                    )
+                        st.download_button(
+                            label="Download Full Report (TXT)",
+                            data=report,
+                            file_name=f"{ticker_input}_report_{datetime.now().strftime('%Y%m%d')}.txt",
+                            mime="text/plain"
+                        )
                 except Exception as e:
                     st.error(f"Error generating report: {str(e)}")
+                    import traceback
+                    st.code(traceback.format_exc())
         
         # Model Architecture Summary
         if st.session_state.model_trained:
