@@ -1,0 +1,9 @@
+# streamlit==1.31.0
+# yfinance==0.2.36
+# pandas==2.2.0
+# numpy==1.26.4
+# plotly==5.18.0
+# scikit-learn==1.4.0
+# tensorflow==2.16.1
+# openpyxl==3.1.2
+# protobuf==4.25.3
