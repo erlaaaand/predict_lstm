@@ -980,6 +980,9 @@ if analyze_button:
                 with st.spinner(f"Membuat prediksi untuk {n_days_predict} hari ke depan..."):
                     st.write("DEBUG: Step 1 - Getting last sequence")
                     # Get last sequence
+                    close_prices = st.session_state.stock_data['Close'].values.reshape(-1, 1)
+                    scaler = st.session_state.scaler
+                    scaled_data = scaler.transform(close_prices)
                     last_sequence = scaled_data[-lookback:]
                     
                     st.write("DEBUG: Step 2 - Calling predict_future")
@@ -996,8 +999,12 @@ if analyze_button:
                         st.error("Failed to generate predictions")
                         st.stop()
                     
+                    # --- PERBAIKAN DIMULAI DI SINI ---
                     # Generate future dates (trading days only)
-                    last_date = stock_data.index[-1]
+                    last_date = st.session_state.stock_data.index[-1]
+                    # Menggunakan pd.date_range dengan frekuensi 'B' (business day)
+                    future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=n_days_predict, freq='B')
+                    # --- PERBAIKAN SELESAI ---
 
                     # Konversi ke Python datetime (bukan pandas Timestamp)
                     if hasattr(last_date, 'to_pydatetime'):
@@ -1229,7 +1236,8 @@ if analyze_button:
                     
                     if future_predictions is not None:
                         # ✅ PERBAIKAN: Gunakan cara yang sama seperti Tab4
-                        last_date = stock_data.index[-1]
+                        last_date = st.session_state.stock_data.index[-1]
+                        future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=n_days_predict, freq='B')
                         
                         # Konversi ke Python datetime
                         if hasattr(last_date, 'to_pydatetime'):
