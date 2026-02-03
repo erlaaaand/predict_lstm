@@ -1,5 +1,6 @@
 """
 Data validation utilities.
+Fixed version with comprehensive validation.
 """
 
 from typing import Tuple
@@ -28,7 +29,7 @@ class DataValidator:
         if data is None or len(data) == 0:
             return False, "Data tidak tersedia"
         
-        min_required = lookback + 50  # Minimal data untuk train/test split
+        min_required = lookback + 50
         if len(data) < min_required:
             return False, (
                 f"Data tidak cukup. Minimal {min_required} data diperlukan, "
@@ -60,14 +61,13 @@ class DataValidator:
         # Remove NaN values
         data = data.dropna()
         
-        # Forward fill then backward fill any remaining NaN - FIXED deprecated method
+        # Forward fill then backward fill any remaining NaN
         data = data.ffill().bfill()
         
         # Ensure positive prices
         numeric_cols = ['Open', 'High', 'Low', 'Close']
         for col in numeric_cols:
             if col in data.columns:
-                # Replace negative or zero values with minimum positive value
                 min_positive = data[col][data[col] > 0].min() if (data[col] > 0).any() else 1.0
                 data[col] = data[col].apply(lambda x: min_positive if x <= 0 else x)
         

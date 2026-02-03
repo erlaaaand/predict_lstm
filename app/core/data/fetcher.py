@@ -1,6 +1,7 @@
 """
 Advanced data fetcher with multiple data sources.
 Inspired by Renaissance Technologies approach.
+Fixed version with comprehensive error handling.
 """
 
 import yfinance as yf
@@ -9,25 +10,55 @@ import numpy as np
 from datetime import datetime, timedelta
 from typing import Optional, Dict
 import streamlit as st
+import warnings
+
+warnings.filterwarnings('ignore')
+
 
 class MultiSourceDataFetcher:
-    """Fetch data from multiple sources."""
+    """Fetch data from multiple sources with robust error handling."""
     
     @staticmethod
     @st.cache_data(ttl=3600, show_spinner=False)
     def fetch_market_data(ticker: str, days: int) -> Optional[pd.DataFrame]:
-        """Fetch traditional market data."""
+        """Fetch traditional market data with validation."""
         try:
+            if not ticker or not ticker.strip():
+                st.error("Ticker cannot be empty")
+                return None
+            
+            # Add buffer for weekends/holidays
             end_date = datetime.now()
             start_date = end_date - timedelta(days=int(days * 1.5))
             
             stock = yf.Ticker(ticker)
             data = stock.history(start=start_date, end=end_date, auto_adjust=True)
             
-            if data.empty:
+            if data is None or data.empty:
+                st.error(f"No data available for ticker: {ticker}")
                 return None
             
+            # Validate required columns
+            required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
+            if not all(col in data.columns for col in required_cols):
+                st.error("Data missing required columns")
+                return None
+            
+            # Clean data
             data = data.dropna()
+            
+            # Remove invalid rows
+            data = data[
+                (data['Open'] > 0) & 
+                (data['High'] > 0) & 
+                (data['Low'] > 0) & 
+                (data['Close'] > 0) &
+                (data['Volume'] >= 0)
+            ]
+            
+            if len(data) < days * 0.5:  # At least 50% of requested days
+                st.warning(f"Limited data available: {len(data)} days")
+            
             return data.tail(days)
             
         except Exception as e:
@@ -36,37 +67,42 @@ class MultiSourceDataFetcher:
     
     @staticmethod
     @st.cache_data(ttl=86400, show_spinner=False)
-    def fetch_fundamental_data(ticker: str) -> Optional[Dict]:
-        """Fetch fundamental data (balance sheet, income statement, etc)."""
+    def fetch_fundamental_data(ticker: str) -> Dict:
+        """Fetch fundamental data with safe defaults."""
         try:
             stock = yf.Ticker(ticker)
-            
             info = stock.info
             
+            # Safe get with defaults
             fundamentals = {
-                'market_cap': info.get('marketCap', 0),
-                'pe_ratio': info.get('trailingPE', 0),
-                'forward_pe': info.get('forwardPE', 0),
-                'peg_ratio': info.get('pegRatio', 0),
-                'price_to_book': info.get('priceToBook', 0),
-                'debt_to_equity': info.get('debtToEquity', 0),
-                'roe': info.get('returnOnEquity', 0),
-                'roa': info.get('returnOnAssets', 0),
-                'profit_margin': info.get('profitMargins', 0),
-                'operating_margin': info.get('operatingMargins', 0),
-                'revenue_growth': info.get('revenueGrowth', 0),
-                'earnings_growth': info.get('earningsGrowth', 0),
-                'current_ratio': info.get('currentRatio', 0),
-                'quick_ratio': info.get('quickRatio', 0),
-                'beta': info.get('beta', 1.0),
-                'dividend_yield': info.get('dividendYield', 0),
-                'payout_ratio': info.get('payoutRatio', 0),
+                'market_cap': info.get('marketCap', 0) or 0,
+                'pe_ratio': info.get('trailingPE', 0) or 0,
+                'forward_pe': info.get('forwardPE', 0) or 0,
+                'peg_ratio': info.get('pegRatio', 0) or 0,
+                'price_to_book': info.get('priceToBook', 0) or 0,
+                'debt_to_equity': info.get('debtToEquity', 0) or 0,
+                'roe': info.get('returnOnEquity', 0) or 0,
+                'roa': info.get('returnOnAssets', 0) or 0,
+                'profit_margin': info.get('profitMargins', 0) or 0,
+                'operating_margin': info.get('operatingMargins', 0) or 0,
+                'revenue_growth': info.get('revenueGrowth', 0) or 0,
+                'earnings_growth': info.get('earningsGrowth', 0) or 0,
+                'current_ratio': info.get('currentRatio', 0) or 0,
+                'quick_ratio': info.get('quickRatio', 0) or 0,
+                'beta': info.get('beta', 1.0) or 1.0,
+                'dividend_yield': info.get('dividendYield', 0) or 0,
+                'payout_ratio': info.get('payoutRatio', 0) or 0,
             }
+            
+            # Clean infinite/NaN values
+            for key, value in fundamentals.items():
+                if not isinstance(value, (int, float)) or np.isnan(value) or np.isinf(value):
+                    fundamentals[key] = 0
             
             return fundamentals
             
         except Exception as e:
-            st.warning(f"Could not fetch fundamental data: {str(e)}")
+            # Return empty dict instead of None
             return {}
     
     @staticmethod
@@ -78,30 +114,37 @@ class MultiSourceDataFetcher:
             
             # Get available expiration dates
             expirations = stock.options
-            if not expirations:
+            if not expirations or len(expirations) == 0:
                 return None
             
             # Get nearest expiration
             nearest_exp = expirations[0]
             opt_chain = stock.option_chain(nearest_exp)
             
-            # Combine calls and puts
-            calls = opt_chain.calls[['strike', 'lastPrice', 'impliedVolatility', 'volume']]
-            puts = opt_chain.puts[['strike', 'lastPrice', 'impliedVolatility', 'volume']]
+            if opt_chain is None:
+                return None
+            
+            # Combine calls and puts safely
+            calls = opt_chain.calls[['strike', 'lastPrice', 'impliedVolatility', 'volume']].copy()
+            puts = opt_chain.puts[['strike', 'lastPrice', 'impliedVolatility', 'volume']].copy()
             
             calls['type'] = 'call'
             puts['type'] = 'put'
             
-            options = pd.concat([calls, puts])
+            options = pd.concat([calls, puts], ignore_index=True)
             
-            return options
+            # Clean data
+            options = options.dropna()
+            options = options[options['impliedVolatility'] > 0]
+            
+            return options if not options.empty else None
             
         except Exception:
             return None
     
     @staticmethod
     def calculate_implied_volatility_metrics(options_df: pd.DataFrame) -> Dict:
-        """Calculate IV metrics from options data."""
+        """Calculate IV metrics from options data with safe defaults."""
         if options_df is None or options_df.empty:
             return {}
         
@@ -109,16 +152,30 @@ class MultiSourceDataFetcher:
             calls = options_df[options_df['type'] == 'call']
             puts = options_df[options_df['type'] == 'put']
             
+            # Safe calculations
+            avg_iv = options_df['impliedVolatility'].mean() if len(options_df) > 0 else 0
+            call_iv = calls['impliedVolatility'].mean() if len(calls) > 0 else 0
+            put_iv = puts['impliedVolatility'].mean() if len(puts) > 0 else 0
+            
+            call_vol = calls['volume'].sum() if len(calls) > 0 else 0
+            put_vol = puts['volume'].sum() if len(puts) > 0 else 0
+            
             metrics = {
-                'avg_iv': options_df['impliedVolatility'].mean(),
-                'call_iv': calls['impliedVolatility'].mean(),
-                'put_iv': puts['impliedVolatility'].mean(),
-                'iv_skew': puts['impliedVolatility'].mean() - calls['impliedVolatility'].mean(),
-                'put_call_ratio': puts['volume'].sum() / (calls['volume'].sum() + 1),
+                'avg_iv': avg_iv,
+                'call_iv': call_iv,
+                'put_iv': put_iv,
+                'iv_skew': put_iv - call_iv,
+                'put_call_ratio': put_vol / (call_vol + 1) if call_vol > 0 else 0,
             }
             
+            # Clean values
+            for key, value in metrics.items():
+                if np.isnan(value) or np.isinf(value):
+                    metrics[key] = 0
+            
             return metrics
-        except:
+            
+        except Exception:
             return {}
     
     @staticmethod
@@ -127,8 +184,8 @@ class MultiSourceDataFetcher:
         """Fetch analyst recommendations and price targets."""
         try:
             stock = yf.Ticker(ticker)
-            
             recommendations = stock.recommendations
+            
             if recommendations is None or recommendations.empty:
                 return {}
             
@@ -154,5 +211,15 @@ class MultiSourceDataFetcher:
             
             return analyst_data
             
-        except:
+        except Exception:
             return {}
+
+
+class StockDataFetcher:
+    """Legacy wrapper for compatibility."""
+    
+    @staticmethod
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def fetch(ticker: str, days: int) -> Optional[pd.DataFrame]:
+        """Fetch stock data (legacy method)."""
+        return MultiSourceDataFetcher.fetch_market_data(ticker, days)

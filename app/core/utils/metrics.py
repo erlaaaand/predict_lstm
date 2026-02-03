@@ -1,5 +1,6 @@
 """
 Model evaluation metrics.
+Fixed version.
 """
 
 import numpy as np
@@ -26,7 +27,6 @@ class MetricsCalculator:
             Tuple of (rmse, mae, mape, r2)
         """
         try:
-            # Remove NaN and inf values
             mask = ~(
                 np.isnan(y_true) | np.isnan(y_pred) |
                 np.isinf(y_true) | np.isinf(y_pred)
@@ -37,14 +37,10 @@ class MetricsCalculator:
             if len(y_true_clean) == 0:
                 return 0.0, 0.0, 0.0, 0.0
             
-            # Calculate metrics
             mse = mean_squared_error(y_true_clean, y_pred_clean)
             rmse = np.sqrt(mse)
             mae = mean_absolute_error(y_true_clean, y_pred_clean)
-            
-            # MAPE with zero handling
             mape = MetricsCalculator._calculate_mape(y_true_clean, y_pred_clean)
-            
             r2 = r2_score(y_true_clean, y_pred_clean)
             
             return rmse, mae, mape, r2
@@ -65,7 +61,6 @@ class MetricsCalculator:
         Returns:
             MAPE value
         """
-        # Remove zeros to avoid division by zero
         mask = y_true != 0
         if not mask.any():
             return 0.0
@@ -94,11 +89,8 @@ class MetricsCalculator:
         if len(y_true) < 2:
             return 0.0
         
-        # Calculate direction changes
         true_direction = np.diff(y_true) > 0
         pred_direction = np.diff(y_pred) > 0
-        
-        # Calculate accuracy
         accuracy = np.mean(true_direction == pred_direction) * 100
         
         return accuracy

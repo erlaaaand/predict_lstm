@@ -1,5 +1,6 @@
 """
 Model prediction utilities.
+Fixed version.
 """
 
 import numpy as np
@@ -39,17 +40,11 @@ class ModelPredictor:
             current_sequence = last_sequence.copy()
             
             for _ in range(n_days):
-                # Reshape for prediction
                 pred_input = current_sequence.reshape(1, lookback, 1)
-                
-                # Make prediction
                 pred = model.predict(pred_input, verbose=0)
                 predictions.append(pred[0, 0])
-                
-                # Update sequence
                 current_sequence = np.append(current_sequence[1:], pred[0, 0])
             
-            # Inverse transform predictions
             predictions = scaler.inverse_transform(
                 np.array(predictions).reshape(-1, 1)
             )
@@ -101,11 +96,9 @@ class ModelPredictor:
         })
         df.set_index('Date', inplace=True)
         
-        # Calculate daily changes
         df['Daily_Change'] = df['Predicted_Price'].diff()
         df['Daily_Change_%'] = df['Predicted_Price'].pct_change() * 100
         
-        # Set first row values
         df.loc[df.index[0], 'Daily_Change'] = predictions[0] - last_actual_price
         df.loc[df.index[0], 'Daily_Change_%'] = (
             (predictions[0] - last_actual_price) / last_actual_price * 100
@@ -136,5 +129,5 @@ class ModelPredictor:
             'final': predictions[-1],
             'expected_return': ((predictions[-1] - last_actual_price) / last_actual_price) * 100,
             'range': predictions.max() - predictions.min(),
-            'cv': (predictions.std() / predictions.mean()) * 100  # Coefficient of variation
+            'cv': (predictions.std() / predictions.mean()) * 100
         }

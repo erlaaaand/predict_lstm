@@ -1,5 +1,6 @@
 """
 Stock analysis service - orchestrates data fetching, processing, and model training.
+Fixed version with compatibility wrapper.
 """
 
 import streamlit as st
@@ -8,14 +9,14 @@ import numpy as np
 from typing import Optional, Dict, Any
 
 from app.core.data import (
-    StockDataFetcher,
     DataValidator,
-    TechnicalIndicators,
-    DataPreprocessor
 )
+from app.core.data.fetcher import StockDataFetcher, MultiSourceDataFetcher
+from app.core.data.indicators import TechnicalIndicators, AdvancedIndicators
+from app.core.data.preprocessor import DataPreprocessor
 from app.core.models import LSTMModelBuilder, ModelTrainer, ModelPredictor
 from app.core.utils import MetricsCalculator
-from app.config import config
+from config.settings import config
 
 
 class StockAnalysisService:
@@ -36,21 +37,16 @@ class StockAnalysisService:
         Returns:
             DataFrame with stock data and indicators or None
         """
-        # Validate ticker
         is_valid, message = DataValidator.validate_ticker(ticker)
         if not is_valid:
             st.error(f"❌ {message}")
             return None
         
-        # Fetch data
         data = StockDataFetcher.fetch(ticker, n_days)
         if data is None:
             return None
         
-        # Clean data
         data = DataValidator.clean_data(data)
-        
-        # Add technical indicators
         data = TechnicalIndicators.add_all_indicators(data)
         
         return data
@@ -70,7 +66,6 @@ class StockAnalysisService:
         Returns:
             Dictionary with trained model and results or None
         """
-        # Validate data
         is_valid, message = DataValidator.validate_for_training(
             data, model_config['lookback']
         )
@@ -78,30 +73,35 @@ class StockAnalysisService:
             st.error(f"❌ {message}")
             return None
         
-        # Prepare data for training
         with st.spinner("Mempersiapkan data untuk training..."):
-            prepared_data = DataPreprocessor.prepare_for_training(
-                data,
-                model_config['lookback'],
-                config.TRAIN_SPLIT,
-                config.VAL_SPLIT
-            )
+            try:
+                prepared_data = DataPreprocessor.prepare_for_training(
+                    data,
+                    model_config['lookback'],
+                    config.TRAIN_SPLIT,
+                    config.VAL_SPLIT
+                )
+            except Exception as e:
+                st.error(f"Preprocessing error: {str(e)}")
+                return None
         
-        # Build model
+        # Get n_features from prepared data
+        n_features = prepared_data.get('n_features', 1)
+        
         model = LSTMModelBuilder.build(
             lookback=model_config['lookback'],
-            units_1=model_config['lstm_units_1'],
-            units_2=model_config['lstm_units_2'],
-            dropout=model_config['dropout'],
-            model_type=model_config['model_type'],
-            learning_rate=model_config['learning_rate']
+            units_1=model_config.get('lstm_units_1', 128),
+            units_2=model_config.get('lstm_units_2', 64),
+            dropout=model_config.get('dropout', 0.2),
+            model_type=model_config.get('model_type', 'Bidirectional LSTM'),
+            learning_rate=model_config.get('learning_rate', 0.001),
+            n_features=n_features
         )
         
         if model is None:
             st.error("Failed to build model")
             return None
         
-        # Train model
         with st.spinner("🎯 Melatih model LSTM..."):
             history = ModelTrainer.train(
                 model=model,
@@ -109,24 +109,23 @@ class StockAnalysisService:
                 y_train=prepared_data['y_train'],
                 X_val=prepared_data['X_val'],
                 y_val=prepared_data['y_val'],
-                epochs=model_config['epochs'],
-                batch_size=model_config['batch_size']
+                epochs=model_config.get('epochs', 100),
+                batch_size=model_config.get('batch_size', 32)
             )
         
         if history is None:
             return None
         
-        # Calculate metrics on all sets
         metrics = StockAnalysisService._evaluate_model(
             model,
             prepared_data,
-            prepared_data['scaler']
+            prepared_data['target_scaler']
         )
         
         return {
             'model': model,
             'history': history,
-            'scaler': prepared_data['scaler'],
+            'scaler': prepared_data['target_scaler'],
             'metrics': metrics,
             'prepared_data': prepared_data
         }
@@ -144,14 +143,10 @@ class StockAnalysisService:
             X = prepared_data[f'X_{dataset}']
             y = prepared_data[f'y_{dataset}']
             
-            # Make predictions
             predictions = model.predict(X, verbose=0)
-            
-            # Inverse transform
             predictions = scaler.inverse_transform(predictions)
             y_actual = scaler.inverse_transform(y.reshape(-1, 1))
             
-            # Calculate metrics
             rmse, mae, mape, r2 = MetricsCalculator.calculate_all(
                 y_actual.flatten(),
                 predictions.flatten()
@@ -187,12 +182,10 @@ class StockAnalysisService:
         Returns:
             Dictionary with predictions and metadata
         """
-        # Get last sequence
         close_prices = data['Close'].values
         scaled_data = scaler.transform(close_prices.reshape(-1, 1))
         last_sequence = scaled_data[-lookback:]
         
-        # Make predictions
         predictions = ModelPredictor.predict_future(
             model, last_sequence, scaler, n_days, lookback
         )
@@ -200,17 +193,14 @@ class StockAnalysisService:
         if predictions is None:
             return None
         
-        # Generate future dates
         last_date = data.index[-1]
         future_dates = ModelPredictor.generate_future_dates(last_date, n_days)
         
-        # Create prediction DataFrame
         last_actual_price = data['Close'].iloc[-1]
         pred_df = ModelPredictor.create_prediction_dataframe(
             future_dates, predictions, last_actual_price
         )
         
-        # Calculate statistics
         stats = ModelPredictor.calculate_prediction_stats(
             predictions, last_actual_price
         )
