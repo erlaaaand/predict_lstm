@@ -1,180 +1,160 @@
 """
-UI styling - Shadcn inspired design system.
+Minimalist chart components.
+Simple, functional visualizations.
 """
 
-import streamlit as st
+import plotly.graph_objects as go
+import pandas as pd
+import numpy as np
 
-
-class UITheme:
-    """Clean, modern UI theme inspired by Shadcn."""
+class ChartComponents:
+    """Simple chart components."""
     
-    # Color palette
+    # Neutral color scheme
     COLORS = {
-        'primary': '#18181b',      # zinc-900
-        'secondary': '#71717a',    # zinc-500
-        'accent': '#3b82f6',       # blue-500
-        'success': '#22c55e',      # green-500
-        'warning': '#f59e0b',      # amber-500
-        'error': '#ef4444',        # red-500
-        'muted': '#f4f4f5',        # zinc-100
-        'border': '#e4e4e7',       # zinc-200
-        'card': '#ffffff',
+        'primary': '#18181b',
+        'secondary': '#71717a',
+        'border': '#e4e4e7',
+        'up': '#22c55e',
+        'down': '#ef4444'
     }
     
     @staticmethod
-    def apply():
-        """Apply custom CSS styling."""
-        st.markdown("""
-        <style>
-        /* Global styles */
-        .main {
-            background-color: #fafafa;
-        }
+    def create_price_chart(data: pd.DataFrame) -> go.Figure:
+        """Create simple price chart with moving averages."""
+        fig = go.Figure()
         
-        /* Typography */
-        h1, h2, h3 {
-            font-weight: 600;
-            color: #18181b;
-        }
+        # Candlestick
+        fig.add_trace(go.Candlestick(
+            x=data.index,
+            open=data['Open'],
+            high=data['High'],
+            low=data['Low'],
+            close=data['Close'],
+            name='Price',
+            increasing_line_color='#18181b',
+            decreasing_line_color='#71717a'
+        ))
         
-        /* Header */
-        .app-header {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #18181b;
-            padding: 1.5rem 0;
-            text-align: center;
-            border-bottom: 1px solid #e4e4e7;
-            margin-bottom: 2rem;
-        }
+        # Moving averages
+        for ma in ['SMA_21', 'SMA_50']:
+            if ma in data.columns:
+                fig.add_trace(go.Scatter(
+                    x=data.index,
+                    y=data[ma],
+                    name=ma,
+                    line=dict(width=1),
+                    opacity=0.7
+                ))
         
-        /* Cards */
-        .metric-card {
-            background: white;
-            padding: 1.5rem;
-            border-radius: 0.5rem;
-            border: 1px solid #e4e4e7;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-            margin: 0.5rem 0;
-        }
+        fig.update_layout(
+            height=500,
+            template='plotly_white',
+            showlegend=True,
+            xaxis_rangeslider_visible=False,
+            hovermode='x unified',
+            margin=dict(l=10, r=10, t=30, b=10),
+            font=dict(family='system-ui', size=12)
+        )
         
-        .info-card {
-            background: #f4f4f5;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            border-left: 3px solid #3b82f6;
-            margin: 1rem 0;
-        }
+        return fig
+    
+    @staticmethod
+    def create_indicator_chart(data: pd.DataFrame, indicator: str, title: str) -> go.Figure:
+        """Create simple indicator chart."""
+        fig = go.Figure()
         
-        /* Buttons */
-        .stButton > button {
-            background-color: #18181b;
-            color: white;
-            border: none;
-            border-radius: 0.375rem;
-            padding: 0.5rem 1rem;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
+        fig.add_trace(go.Scatter(
+            x=data.index,
+            y=data[indicator],
+            line=dict(color='#18181b', width=1.5),
+            name=indicator
+        ))
         
-        .stButton > button:hover {
-            background-color: #27272a;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
+        fig.update_layout(
+            title=title,
+            height=300,
+            template='plotly_white',
+            showlegend=False,
+            hovermode='x unified',
+            margin=dict(l=10, r=10, t=40, b=10),
+            font=dict(family='system-ui', size=12)
+        )
         
-        /* Tabs */
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 0.5rem;
-            background-color: transparent;
-        }
+        return fig
+    
+    @staticmethod
+    def create_training_chart(history) -> go.Figure:
+        """Create training loss chart."""
+        fig = go.Figure()
         
-        .stTabs [data-baseweb="tab"] {
-            height: 2.5rem;
-            padding: 0 1.5rem;
-            background-color: white;
-            border: 1px solid #e4e4e7;
-            border-radius: 0.375rem;
-            color: #71717a;
-            font-weight: 500;
-        }
+        fig.add_trace(go.Scatter(
+            y=history.history['loss'],
+            name='Train Loss',
+            line=dict(color='#18181b', width=2)
+        ))
         
-        .stTabs [aria-selected="true"] {
-            background-color: #18181b;
-            color: white;
-            border-color: #18181b;
-        }
+        fig.add_trace(go.Scatter(
+            y=history.history['val_loss'],
+            name='Val Loss',
+            line=dict(color='#71717a', width=2)
+        ))
         
-        /* Metrics */
-        [data-testid="stMetricValue"] {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: #18181b;
-        }
+        fig.update_layout(
+            title='Training Progress',
+            xaxis_title='Epoch',
+            yaxis_title='Loss',
+            height=400,
+            template='plotly_white',
+            margin=dict(l=10, r=10, t=40, b=10),
+            font=dict(family='system-ui', size=12)
+        )
         
-        [data-testid="stMetricDelta"] {
-            font-size: 0.875rem;
-        }
+        return fig
+    
+    @staticmethod
+    def create_prediction_chart(
+        historical: pd.DataFrame,
+        predictions: np.ndarray,
+        dates: pd.DatetimeIndex
+    ) -> go.Figure:
+        """Create prediction chart."""
+        fig = go.Figure()
         
-        /* Dataframes */
-        .dataframe {
-            border: 1px solid #e4e4e7;
-            border-radius: 0.5rem;
-        }
+        # Historical
+        hist_window = historical.tail(60)
+        fig.add_trace(go.Scatter(
+            x=hist_window.index,
+            y=hist_window['Close'],
+            name='Historical',
+            line=dict(color='#18181b', width=2)
+        ))
         
-        /* Inputs */
-        .stTextInput > div > div > input,
-        .stSelectbox > div > div {
-            border-radius: 0.375rem;
-            border: 1px solid #e4e4e7;
-        }
+        # Predictions
+        fig.add_trace(go.Scatter(
+            x=dates,
+            y=predictions,
+            name='Prediction',
+            line=dict(color='#71717a', width=2, dash='dash'),
+            mode='lines+markers',
+            marker=dict(size=5)
+        ))
         
-        /* Sidebar */
-        [data-testid="stSidebar"] {
-            background-color: white;
-            border-right: 1px solid #e4e4e7;
-        }
+        # Separator line
+        if len(historical) > 0:
+            fig.add_vline(
+                x=historical.index[-1],
+                line_dash="dot",
+                line_color='#e4e4e7'
+            )
         
-        /* Progress bar */
-        .stProgress > div > div > div > div {
-            background-color: #3b82f6;
-        }
+        fig.update_layout(
+            title='Price Prediction',
+            height=500,
+            template='plotly_white',
+            hovermode='x unified',
+            margin=dict(l=10, r=10, t=40, b=10),
+            font=dict(family='system-ui', size=12)
+        )
         
-        /* Expander */
-        .streamlit-expanderHeader {
-            background-color: #f4f4f5;
-            border-radius: 0.375rem;
-            font-weight: 500;
-        }
-        
-        /* Clean slider */
-        .stSlider > div > div > div {
-            background-color: #e4e4e7;
-        }
-        
-        .stSlider > div > div > div > div {
-            background-color: #3b82f6;
-        }
-        
-        /* Remove extra padding */
-        .block-container {
-            padding-top: 2rem;
-            padding-bottom: 2rem;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
-
-def render_header(title: str, icon: str = "📈"):
-    """Render application header."""
-    st.markdown(
-        f'<div class="app-header">{icon} {title}</div>',
-        unsafe_allow_html=True
-    )
-
-
-def render_info_box(message: str):
-    """Render info box."""
-    st.markdown(
-        f'<div class="info-card">{message}</div>',
-        unsafe_allow_html=True
-    )
+        return fig

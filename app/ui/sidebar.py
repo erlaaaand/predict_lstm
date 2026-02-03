@@ -1,156 +1,105 @@
 """
-Sidebar component for parameter configuration.
+Minimalist sidebar component.
+Simple, functional, no clutter.
 """
 
 import streamlit as st
-from app.config import config
-
+from config.settings import config
 
 class SidebarComponent:
-    """Renders sidebar with parameter controls."""
+    """Clean sidebar for parameter configuration."""
     
     @staticmethod
     def render() -> dict:
-        """
-        Render sidebar and return user configuration.
-        
-        Returns:
-            Dictionary with user-selected parameters
-        """
+        """Render sidebar and return configuration."""
         with st.sidebar:
-            st.header("🔧 Pengaturan Analisis")
+            st.markdown("### Configuration")
             
-            # Data parameters
-            data_params = SidebarComponent._render_data_section()
+            # Data section
+            params = SidebarComponent._render_data_params()
             
             st.markdown("---")
             
-            # Model parameters
-            model_params = SidebarComponent._render_model_section()
+            # Model section
+            model_params = SidebarComponent._render_model_params()
+            params.update(model_params)
             
             st.markdown("---")
             
             # Action buttons
-            analyze_button = st.button(
-                "🚀 Mulai Analisis",
-                type="primary",
-                use_container_width=True
-            )
+            analyze = st.button("Run Analysis", type="primary", use_container_width=True)
+            reset = st.button("Reset", use_container_width=True)
             
-            reset_button = st.button(
-                "🔄 Reset",
-                use_container_width=True
-            )
+            params['analyze'] = analyze
+            params['reset'] = reset
             
-            return {
-                **data_params,
-                **model_params,
-                'analyze_button': analyze_button,
-                'reset_button': reset_button
-            }
+            return params
     
     @staticmethod
-    def _render_data_section() -> dict:
-        """Render data parameters section."""
-        st.subheader("📊 Parameter Data")
+    def _render_data_params() -> dict:
+        """Render data configuration."""
+        st.markdown("#### Data")
         
         ticker = st.text_input(
-            "Ticker Saham",
+            "Ticker",
             value="BBCA.JK",
-            help="Contoh: BBCA.JK, TLKM.JK, AAPL"
+            help="Stock ticker symbol"
         ).upper()
         
-        n_days_data = st.slider(
-            "Jumlah Data (hari trading)",
+        data_days = st.slider(
+            "Data Period (days)",
             min_value=config.MIN_DATA_DAYS,
             max_value=config.MAX_DATA_DAYS,
             value=config.DEFAULT_DATA_DAYS,
-            step=30
+            step=90
         )
         
-        n_days_predict = st.slider(
-            "Jumlah Hari Prediksi",
-            min_value=config.MIN_PREDICT_DAYS,
-            max_value=config.MAX_PREDICT_DAYS,
-            value=config.DEFAULT_PREDICT_DAYS,
+        predict_days = st.slider(
+            "Prediction Period (days)",
+            min_value=1,
+            max_value=60,
+            value=14,
             step=1
         )
         
         return {
             'ticker': ticker,
-            'n_days_data': n_days_data,
-            'n_days_predict': n_days_predict
+            'data_days': data_days,
+            'predict_days': predict_days
         }
     
     @staticmethod
-    def _render_model_section() -> dict:
-        """Render model parameters section."""
-        st.subheader("🤖 Parameter Model")
-        
-        model_type = st.selectbox(
-            "Tipe Model",
-            config.MODEL_TYPES,
-            index=1  # Default to Bidirectional
-        )
+    def _render_model_params() -> dict:
+        """Render model configuration."""
+        st.markdown("#### Model")
         
         lookback = st.slider(
             "Lookback Period",
             min_value=config.MIN_LOOKBACK,
             max_value=config.MAX_LOOKBACK,
             value=config.DEFAULT_LOOKBACK,
-            step=5
+            step=10
         )
         
-        with st.expander("⚙️ Advanced Settings"):
-            lstm_units_1 = st.slider(
-                "LSTM Units (Layer 1)",
-                min_value=config.MIN_LSTM_UNITS,
-                max_value=config.MAX_LSTM_UNITS,
-                value=config.DEFAULT_LSTM_UNITS_1,
-                step=32
-            )
-            
-            lstm_units_2 = st.slider(
-                "LSTM Units (Layer 2)",
-                min_value=32,
-                max_value=128,
-                value=config.DEFAULT_LSTM_UNITS_2,
-                step=16
-            )
-            
-            dropout = st.slider(
-                "Dropout Rate",
-                min_value=config.MIN_DROPOUT,
-                max_value=config.MAX_DROPOUT,
-                value=config.DEFAULT_DROPOUT,
-                step=0.1
-            )
-            
-            epochs = st.slider(
-                "Epochs",
-                min_value=config.MIN_EPOCHS,
-                max_value=config.MAX_EPOCHS,
-                value=config.DEFAULT_EPOCHS,
-                step=25
-            )
-            
-            batch_size = st.selectbox(
-                "Batch Size",
-                config.BATCH_SIZES,
-                index=1
-            )
-            
+        use_ensemble = st.checkbox("Use Ensemble", value=True)
+        
+        with st.expander("Advanced"):
+            units_1 = st.slider("LSTM Units L1", 64, 256, 128, 32)
+            units_2 = st.slider("LSTM Units L2", 32, 128, 64, 16)
+            dropout = st.slider("Dropout", 0.2, 0.5, 0.3, 0.05)
+            epochs = st.slider("Epochs", 50, 200, 100, 25)
+            batch_size = st.selectbox("Batch Size", [16, 32, 64], index=1)
             learning_rate = st.select_slider(
                 "Learning Rate",
-                options=config.LEARNING_RATES,
-                value=config.DEFAULT_LEARNING_RATE
+                options=[0.0001, 0.0005, 0.001, 0.005],
+                value=0.001
             )
         
         return {
-            'model_type': model_type,
             'lookback': lookback,
-            'lstm_units_1': lstm_units_1,
-            'lstm_units_2': lstm_units_2,
+            'use_ensemble': use_ensemble,
+            'units_1': units_1,
+            'units_2': units_2,
             'dropout': dropout,
             'epochs': epochs,
             'batch_size': batch_size,

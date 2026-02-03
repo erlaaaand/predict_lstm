@@ -1,84 +1,88 @@
 """
-Data preprocessing utilities.
+Advanced data preprocessing with feature engineering.
 """
 
 import numpy as np
 import pandas as pd
-from typing import Tuple
-from sklearn.preprocessing import MinMaxScaler
-
+from sklearn.preprocessing import RobustScaler
+from typing import Tuple, Dict
 
 class DataPreprocessor:
-    """Preprocesses data for LSTM training."""
+    """Preprocess data with feature engineering."""
+    
+    @staticmethod
+    def prepare_features(
+        data: pd.DataFrame,
+        fundamental_data: Dict = None
+    ) -> pd.DataFrame:
+        """Prepare feature matrix including fundamentals."""
+        df = data.copy()
+        
+        # Select technical features
+        feature_cols = [col for col in df.columns if col not in ['Open', 'High', 'Low', 'Close', 'Volume']]
+        
+        # Add fundamental features if available
+        if fundamental_data:
+            for key, value in fundamental_data.items():
+                if value and not np.isnan(value):
+                    df[key] = value
+        
+        # Forward fill and drop NaN
+        df = df.fillna(method='ffill').fillna(method='bfill')
+        df = df.dropna()
+        
+        return df
     
     @staticmethod
     def create_sequences(
-        data: np.ndarray, 
-        lookback: int
+        data: np.ndarray,
+        lookback: int,
+        target_col_idx: int = 0
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Create sequences for LSTM.
-        
-        Args:
-            data: Scaled price data
-            lookback: Number of time steps to look back
-            
-        Returns:
-            Tuple of (X, y) arrays
-        """
+        """Create sequences for LSTM."""
         X, y = [], []
         
         for i in range(lookback, len(data)):
             X.append(data[i-lookback:i])
-            y.append(data[i])
+            y.append(data[i, target_col_idx])
         
         return np.array(X), np.array(y)
     
     @staticmethod
-    def scale_data(data: np.ndarray) -> Tuple[np.ndarray, MinMaxScaler]:
-        """
-        Scale data using MinMaxScaler.
+    def scale_data(
+        data: np.ndarray,
+        scaler=None
+    ) -> Tuple[np.ndarray, object]:
+        """Scale data using RobustScaler (resistant to outliers)."""
+        if scaler is None:
+            scaler = RobustScaler()
+            scaled = scaler.fit_transform(data)
+        else:
+            scaled = scaler.transform(data)
         
-        Args:
-            data: Raw price data
-            
-        Returns:
-            Tuple of (scaled_data, scaler)
-        """
-        scaler = MinMaxScaler(feature_range=(0, 1))
-        scaled_data = scaler.fit_transform(data.reshape(-1, 1))
-        return scaled_data, scaler
+        return scaled, scaler
     
     @staticmethod
     def split_data(
         X: np.ndarray,
         y: np.ndarray,
-        train_split: float = 0.8,
-        val_split: float = 0.1
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Split data into train, validation, and test sets.
+        train_size: float = 0.7,
+        val_size: float = 0.15
+    ) -> Tuple:
+        """Split data chronologically."""
+        n = len(X)
         
-        Args:
-            X: Input sequences
-            y: Target values
-            train_split: Proportion of data for training
-            val_split: Proportion of data for validation
-            
-        Returns:
-            Tuple of (X_train, y_train, X_val, y_val, X_test, y_test)
-        """
-        train_size = int(train_split * len(X))
-        val_size = int(val_split * len(X))
+        train_end = int(n * train_size)
+        val_end = int(n * (train_size + val_size))
         
-        X_train = X[:train_size]
-        y_train = y[:train_size]
+        X_train = X[:train_end]
+        y_train = y[:train_end]
         
-        X_val = X[train_size:train_size + val_size]
-        y_val = y[train_size:train_size + val_size]
+        X_val = X[train_end:val_end]
+        y_val = y[train_end:val_end]
         
-        X_test = X[train_size + val_size:]
-        y_test = y[train_size + val_size:]
+        X_test = X[val_end:]
+        y_test = y[val_end:]
         
         return X_train, y_train, X_val, y_val, X_test, y_test
     
@@ -86,34 +90,29 @@ class DataPreprocessor:
     def prepare_for_training(
         data: pd.DataFrame,
         lookback: int,
-        train_split: float = 0.8,
-        val_split: float = 0.1
-    ) -> dict:
-        """
-        Complete data preparation pipeline.
+        fundamental_data: Dict = None
+    ) -> Dict:
+        """Complete preprocessing pipeline."""
+        # Prepare features
+        df = DataPreprocessor.prepare_features(data, fundamental_data)
         
-        Args:
-            data: Stock data DataFrame
-            lookback: Lookback period
-            train_split: Training data proportion
-            val_split: Validation data proportion
-            
-        Returns:
-            Dictionary containing all prepared data and scaler
-        """
-        # Extract close prices
-        close_prices = data['Close'].values
+        # Extract target (Close price)
+        target = df['Close'].values.reshape(-1, 1)
         
-        # Scale data
-        scaled_data, scaler = DataPreprocessor.scale_data(close_prices)
+        # Extract all features
+        features = df.values
+        
+        # Scale
+        scaled_data, scaler = DataPreprocessor.scale_data(features)
+        
+        # Target scaler (for inverse transform)
+        target_scaled, target_scaler = DataPreprocessor.scale_data(target)
         
         # Create sequences
-        X, y = DataPreprocessor.create_sequences(scaled_data, lookback)
+        X, y = DataPreprocessor.create_sequences(scaled_data, lookback, target_col_idx=df.columns.get_loc('Close'))
         
-        # Split data
-        X_train, y_train, X_val, y_val, X_test, y_test = DataPreprocessor.split_data(
-            X, y, train_split, val_split
-        )
+        # Split
+        X_train, y_train, X_val, y_val, X_test, y_test = DataPreprocessor.split_data(X, y)
         
         return {
             'X_train': X_train,
@@ -123,5 +122,6 @@ class DataPreprocessor:
             'X_test': X_test,
             'y_test': y_test,
             'scaler': scaler,
-            'scaled_data': scaled_data
+            'target_scaler': target_scaler,
+            'feature_names': df.columns.tolist()
         }
