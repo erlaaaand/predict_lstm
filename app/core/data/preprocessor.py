@@ -7,6 +7,7 @@ import pandas as pd
 from sklearn.preprocessing import RobustScaler
 from typing import Tuple, Dict
 
+
 class DataPreprocessor:
     """Preprocess data with feature engineering."""
     
@@ -24,11 +25,11 @@ class DataPreprocessor:
         # Add fundamental features if available
         if fundamental_data:
             for key, value in fundamental_data.items():
-                if value and not np.isnan(value):
+                if value and not np.isnan(value) and not np.isinf(value):
                     df[key] = value
         
-        # Forward fill and drop NaN
-        df = df.fillna(method='ffill').fillna(method='bfill')
+        # Forward fill and backward fill - FIXED deprecated method
+        df = df.ffill().bfill()
         df = df.dropna()
         
         return df
@@ -90,13 +91,22 @@ class DataPreprocessor:
     def prepare_for_training(
         data: pd.DataFrame,
         lookback: int,
+        train_split: float = 0.7,
+        val_split: float = 0.15,
         fundamental_data: Dict = None
     ) -> Dict:
         """Complete preprocessing pipeline."""
         # Prepare features
         df = DataPreprocessor.prepare_features(data, fundamental_data)
         
+        # Ensure we have enough data
+        if len(df) < lookback + 50:
+            raise ValueError(f"Insufficient data: need at least {lookback + 50} rows, got {len(df)}")
+        
         # Extract target (Close price)
+        if 'Close' not in df.columns:
+            raise ValueError("'Close' column not found in data")
+        
         target = df['Close'].values.reshape(-1, 1)
         
         # Extract all features
@@ -109,10 +119,20 @@ class DataPreprocessor:
         target_scaled, target_scaler = DataPreprocessor.scale_data(target)
         
         # Create sequences
-        X, y = DataPreprocessor.create_sequences(scaled_data, lookback, target_col_idx=df.columns.get_loc('Close'))
+        X, y = DataPreprocessor.create_sequences(
+            scaled_data, 
+            lookback, 
+            target_col_idx=df.columns.get_loc('Close')
+        )
+        
+        # Check if we have enough sequences
+        if len(X) < 50:
+            raise ValueError(f"Not enough sequences created: {len(X)}. Need at least 50.")
         
         # Split
-        X_train, y_train, X_val, y_val, X_test, y_test = DataPreprocessor.split_data(X, y)
+        X_train, y_train, X_val, y_val, X_test, y_test = DataPreprocessor.split_data(
+            X, y, train_split, val_split
+        )
         
         return {
             'X_train': X_train,

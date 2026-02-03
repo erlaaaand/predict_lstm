@@ -25,10 +25,10 @@ class DataValidator:
         Returns:
             Tuple of (is_valid, message)
         """
-        if data is None:
+        if data is None or len(data) == 0:
             return False, "Data tidak tersedia"
         
-        min_required = lookback + 20  # Minimal data untuk train/test split
+        min_required = lookback + 50  # Minimal data untuk train/test split
         if len(data) < min_required:
             return False, (
                 f"Data tidak cukup. Minimal {min_required} data diperlukan, "
@@ -60,14 +60,16 @@ class DataValidator:
         # Remove NaN values
         data = data.dropna()
         
-        # Forward fill then backward fill any remaining NaN
-        data = data.fillna(method='ffill').fillna(method='bfill')
+        # Forward fill then backward fill any remaining NaN - FIXED deprecated method
+        data = data.ffill().bfill()
         
         # Ensure positive prices
         numeric_cols = ['Open', 'High', 'Low', 'Close']
         for col in numeric_cols:
             if col in data.columns:
-                data[col] = data[col].abs()
+                # Replace negative or zero values with minimum positive value
+                min_positive = data[col][data[col] > 0].min() if (data[col] > 0).any() else 1.0
+                data[col] = data[col].apply(lambda x: min_positive if x <= 0 else x)
         
         return data
     

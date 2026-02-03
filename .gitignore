@@ -46,7 +46,7 @@ ENV/
 *.pickle
 
 # Model files
-models/
+# models/
 checkpoints/
 saved_models/
 
