@@ -16,7 +16,7 @@ from app.core.data.indicators import TechnicalIndicators, AdvancedIndicators
 from app.core.data.preprocessor import DataPreprocessor
 from app.core.models import LSTMModelBuilder, ModelTrainer, ModelPredictor
 from app.core.utils import MetricsCalculator
-from config.settings import config
+from app.config.settings import config
 
 
 class StockAnalysisService:

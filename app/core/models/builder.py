@@ -10,7 +10,7 @@ from tensorflow.keras.regularizers import l1_l2
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from typing import Optional, Tuple, List
 import numpy as np
-from config.settings import config
+from app.config.settings import config
 
 
 class RegularizedLSTMBuilder:

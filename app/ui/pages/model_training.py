@@ -5,6 +5,7 @@ Model training page component.
 import streamlit as st
 import pandas as pd
 import numpy as np
+import plotly.graph_objects as go
 from app.ui.charts import ChartComponents
 
 
@@ -14,7 +15,7 @@ class ModelTrainingPage:
     @staticmethod
     def render(training_results: dict, data, lookback: int):
         """Render model training results page."""
-        st.subheader("🤖 Hasil Pelatihan Model")
+        st.subheader("Hasil Pelatihan Model")
         
         # Training curves
         ModelTrainingPage._render_training_curves(training_results['history'])
@@ -36,7 +37,7 @@ class ModelTrainingPage:
     @staticmethod
     def _render_training_curves(history):
         """Render training loss and MAE curves."""
-        st.subheader("📊 Kurva Pelatihan")
+        st.subheader("Kurva Pelatihan")
         
         col1, col2 = st.columns(2)
         
@@ -51,7 +52,7 @@ class ModelTrainingPage:
     @staticmethod
     def _render_metrics_table(metrics: dict):
         """Render metrics comparison table."""
-        st.subheader("🎯 Metrik Evaluasi")
+        st.subheader("Metrik Evaluasi")
         
         metrics_df = pd.DataFrame({
             'Dataset': ['Training', 'Validation', 'Test'],
@@ -90,7 +91,7 @@ class ModelTrainingPage:
     @staticmethod
     def _render_predictions(results: dict, data, lookback: int):
         """Render prediction vs actual chart."""
-        st.subheader("📈 Prediksi vs Aktual")
+        st.subheader("Prediksi vs Aktual")
         
         model = results['model']
         scaler = results['scaler']
@@ -125,7 +126,7 @@ class ModelTrainingPage:
     @staticmethod
     def _render_residual_analysis(results: dict):
         """Render residual analysis."""
-        st.subheader("📊 Analisis Residual (Test Set)")
+        st.subheader("Analisis Residual (Test Set)")
         
         model = results['model']
         scaler = results['scaler']
@@ -144,8 +145,6 @@ class ModelTrainingPage:
         
         with col1:
             # Residual scatter plot
-            import plotly.graph_objects as go
-            
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=test_pred,
@@ -155,12 +154,13 @@ class ModelTrainingPage:
                 name='Residuals'
             ))
             fig.add_hline(y=0, line_dash="dash", line_color="red")
+            
+            # Hapus template='plotly_white'
             fig.update_layout(
                 title='Residual Plot',
                 xaxis_title='Predicted Values',
                 yaxis_title='Residuals',
-                height=400,
-                template='plotly_white'
+                height=400
             )
             st.plotly_chart(fig, use_container_width=True)
         
@@ -173,12 +173,13 @@ class ModelTrainingPage:
                 marker_color='#14b8a6',
                 name='Residuals'
             ))
+            
+            # Hapus template='plotly_white'
             fig.update_layout(
                 title='Distribusi Residual',
                 xaxis_title='Residual',
                 yaxis_title='Frekuensi',
                 height=400,
-                template='plotly_white',
                 showlegend=False
             )
             st.plotly_chart(fig, use_container_width=True)
@@ -189,8 +190,9 @@ class ModelTrainingPage:
         model = results['model']
         metrics = results['metrics']
         
+        # Mengganti st.success emoji dengan format bersih
         st.success(f"""
-        ✅ **Model berhasil dilatih!**
+        **Model Berhasil Dilatih**
         
         - Total Parameters: {model.count_params():,}
         - Test MAPE: {metrics['test']['mape']:.2f}%

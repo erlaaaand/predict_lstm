@@ -188,41 +188,73 @@ class ChartComponents:
     @staticmethod
     def create_prediction_chart(
         historical: pd.DataFrame,
-        predictions: np.ndarray,
-        dates: pd.DatetimeIndex
-    ) -> go.Figure:
-        """Create prediction chart."""
+        train_pred: np.ndarray,
+        val_pred: np.ndarray,
+        test_pred: np.ndarray,
+        train_dates: pd.DatetimeIndex,
+        val_dates: pd.DatetimeIndex,
+        test_dates: pd.DatetimeIndex
+    ):
+        """
+        Membuat chart interaktif yang membandingkan data historis dengan
+        prediksi pada fase Training, Validation, dan Testing.
+        """
         fig = go.Figure()
-        
-        hist_window = historical.tail(60)
+
+        # 1. Plot Data Historis (Actual)
+        # Menggunakan kolom 'Close' dari dataframe historical
         fig.add_trace(go.Scatter(
-            x=hist_window.index,
-            y=hist_window['Close'],
-            name='Historical',
-            line=dict(color='#18181b', width=2)
+            x=historical.index,
+            y=historical['Close'],
+            mode='lines',
+            name='Data Aktual',
+            line=dict(color='gray', width=1, dash='solid'),
+            opacity=0.6
         ))
-        
+
+        # 2. Plot Prediksi Training (Warna Biru)
         fig.add_trace(go.Scatter(
-            x=dates,
-            y=predictions,
-            name='Prediction',
-            line=dict(color='#71717a', width=2, dash='dash'),
-            mode='lines+markers',
-            marker=dict(size=5)
+            x=train_dates,
+            y=train_pred,
+            mode='lines',
+            name='Prediksi (Train)',
+            line=dict(color='#3b82f6', width=2)
         ))
-        
-        if len(historical) > 0:
-            fig.add_vline(x=historical.index[-1], line_dash="dot", line_color='#e4e4e7')
-        
+
+        # 3. Plot Prediksi Validation (Warna Kuning/Oranye)
+        fig.add_trace(go.Scatter(
+            x=val_dates,
+            y=val_pred,
+            mode='lines',
+            name='Prediksi (Validation)',
+            line=dict(color='#f59e0b', width=2)
+        ))
+
+        # 4. Plot Prediksi Testing (Warna Hijau - atau Merah untuk highlight)
+        fig.add_trace(go.Scatter(
+            x=test_dates,
+            y=test_pred,
+            mode='lines',
+            name='Prediksi (Test)',
+            line=dict(color='#10b981', width=2)
+        ))
+
+        # Update Layout
         fig.update_layout(
-            title='Price Prediction',
-            height=500,
+            title='Perbandingan Prediksi vs Aktual (Train/Val/Test)',
+            xaxis_title='Tanggal',
+            yaxis_title='Harga',
             template='plotly_white',
             hovermode='x unified',
-            margin=dict(l=10, r=10, t=40, b=10),
-            font=dict(family='system-ui', size=12)
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            )
         )
-        
+
         return fig
     
     @staticmethod

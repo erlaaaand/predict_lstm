@@ -46,11 +46,11 @@ class TechnicalAnalysisPage:
             marker_color='#3b82f6'
         ))
         
+        # Hapus template fixed, biarkan Streamlit menangani warna
         fig.update_layout(
             xaxis_title='Returns (%)',
             yaxis_title='Frekuensi',
             height=400,
-            template='plotly_white',
             showlegend=False
         )
         
@@ -76,11 +76,11 @@ class TechnicalAnalysisPage:
             name='Volatilitas'
         ))
         
+        # Hapus template fixed
         fig.update_layout(
             xaxis_title='Tanggal',
             yaxis_title='Volatilitas (%)',
             height=400,
-            template='plotly_white',
             showlegend=False
         )
         

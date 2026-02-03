@@ -19,7 +19,7 @@ class ExportPage:
         model_config: dict = None
     ):
         """Render export page."""
-        st.subheader("💾 Export Data")
+        st.subheader("Export Data")
         
         col1, col2, col3 = st.columns(3)
         
@@ -46,7 +46,7 @@ class ExportPage:
     @staticmethod
     def _render_historical_export(data: pd.DataFrame, ticker: str):
         """Render historical data export."""
-        st.write("**📊 Data Historis**")
+        st.write("**Data Historis**")
         
         csv_data = data.to_csv()
         
@@ -61,7 +61,7 @@ class ExportPage:
     @staticmethod
     def _render_prediction_export(results: dict, ticker: str):
         """Render prediction data export."""
-        st.write("**🔮 Data Prediksi**")
+        st.write("**Data Prediksi**")
         
         csv_data = results['dataframe'].to_csv()
         
@@ -82,7 +82,7 @@ class ExportPage:
         config: dict
     ):
         """Render comprehensive report export."""
-        st.write("**📈 Laporan Lengkap**")
+        st.write("**Laporan Lengkap**")
         
         report = ExportPage._generate_report(
             data, ticker, pred_results, train_results, config
@@ -96,6 +96,7 @@ class ExportPage:
             use_container_width=True
         )
     
+    # ... Method _generate_report tidak perlu diubah karena hanya teks ...
     @staticmethod
     def _generate_report(
         data: pd.DataFrame,
@@ -182,13 +183,12 @@ Tidak boleh digunakan sebagai saran investasi.
 
 ================================================================================
 """
-        
         return report
-    
+
     @staticmethod
     def _render_model_architecture(model):
         """Render model architecture summary."""
-        with st.expander("🏗️ Model Architecture"):
+        with st.expander("Model Architecture"):
             model_summary = []
             model.summary(print_fn=lambda x: model_summary.append(x))
             st.text('\n'.join(model_summary))

@@ -6,7 +6,7 @@ Fixed version with comprehensive error handling and validation.
 import streamlit as st
 import pandas as pd
 import numpy as np
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 import warnings
 
 from app.core.data.fetcher import MultiSourceDataFetcher

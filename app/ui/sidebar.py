@@ -4,7 +4,7 @@ Simple, functional, no clutter.
 """
 
 import streamlit as st
-from config.settings import config
+from app.config.settings import config
 
 class SidebarComponent:
     """Clean sidebar for parameter configuration."""

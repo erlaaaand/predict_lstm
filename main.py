@@ -7,7 +7,7 @@ FIXED VERSION - Comprehensive error handling and stability improvements.
 import streamlit as st
 import pandas as pd
 import numpy as np
-from config.settings import config
+from app.config.settings import config
 from app.ui.styling import MinimalistTheme, render_header
 from app.ui.sidebar import SidebarComponent
 from app.ui.charts import ChartComponents
